@@ -4,37 +4,56 @@ import android.os.Message;
 import android.util.Log;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by Administrator on 2017/10/3.
  */
 public class Task extends MainActivity{
-    static File fileDir = new File("/storage/emulated/0/dl");
+    File fileDir = new File("/storage/emulated/0/dl");
+    static String nowPath = "/storage/emulated/0/dl";
     URL url;
     String fileName;
     String fileExtension;
-    FileOutputStream fos;
-    String size = "Unknown";
+    private File fileNow = null;
+    public String size = "Unknown";
     double totalByte;
+    double byte0;
     double finished;
     double percentage = 0;
     boolean completed = false;
     boolean notified = false;
     int id = -1;
+    boolean paused;
+
+    int threadNum = 3;
+
+    private long finished0[] = new long[threadNum];
 
     Task(URL url)
     {
+        fileDir = new File(nowPath);
         this.url = url;
         fileName = getFileName();
         fileExtension = getFileExtension();
+        paused = false;
         FileOutputStream fos;
 
 
         //       MainActivity.task0.setText("File name: " + fileName + "   File extension: " + fileExtension);
+    }
+
+    public void paused()
+    {
+        paused = true;
     }
 
     String getSize()
@@ -50,6 +69,7 @@ public class Task extends MainActivity{
             {
                 size = getSize.size0;
                 totalByte = getSize.fileSize;
+                byte0 = totalByte / threadNum;
             }
         }
 
@@ -59,7 +79,7 @@ public class Task extends MainActivity{
     String getFileName()
     {
         String strName = url.getPath();
-        strName = strName.substring(strName.lastIndexOf("/") + 1, strName.lastIndexOf(".") - 1);
+        strName = strName.substring(strName.lastIndexOf("/") + 1, strName.lastIndexOf("."));
         return strName;
     }
 
@@ -71,56 +91,99 @@ public class Task extends MainActivity{
         return strExtension;
     }
 
-    void start()
+    public void start()
     {
-        Thread th = new Thread() {
-            public void run() {
-                try
+        getSize();
+        File file = new File(fileDir.toString() + File.separator + fileName + fileExtension);
+        for (int i = 1; file.exists(); i++) {
+            file = new File(fileDir + File.separator + fileName + "_" + i + fileExtension);//防止覆盖
+            fileNow = new File(fileDir + File.separator + fileName + "_" + i + fileExtension);
+        }
+        Thread[] t = new Thread[threadNum];
+        for (int i = 0; i < threadNum; i++)
+        {
+            final int finalI = i;
+            final double begin = i * byte0;
+            final double end;
+            if(i == threadNum - 1) end = totalByte + 1;
+            else end = (i + 1)* byte0 - 1;
+            final File finalFile = file;
+            t[i] = new Thread() {
+                public void run() {
+                    try {
+                        InputStream is;
+                        RandomAccessFile raf = new RandomAccessFile(finalFile, "rwd");
+                        raf.seek((long)begin);
 
-                {
-                    InputStream is;
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(3 * 1000);
-                    //        conn.connect();
-                    //   Log.e("conn: ", conn.toString());
-                    is = url.openStream();
+                        download(raf, (long)begin, (long)end, finalI);
 
-                    //    InputStream is = conn.getInputStream();
-
-                    if (is == null) {
-                        Log.e("conn: ", "a");
                     }
-     //               File fileDir = new File("/storage/emulated/0/dl");
-//                    if (!fileDir.exists())
+                    catch (Exception e)
                     {
-//                        fileDir.mkdir();
+                        e.printStackTrace();
                     }
-                    File file = new File(fileDir.toString() + File.separator + fileName + fileExtension);
-                    for(int i = 1; file.exists(); i++)
-                    {
-                        file = new File(fileDir + File.separator + fileName + "_" + i + fileExtension);//防止覆盖
-                    }
-                    fos = new FileOutputStream(file);
-                    download(is, fos);
-
-                } catch (
-                        Exception e)
-
-                {
-                    e.printStackTrace();
                 }
-            }
-        };
-        th.start();
+            };
+            t[i].start();
+        }
     }
 
-    private void download(InputStream is, FileOutputStream fos)
+    public void resume()
+    {
+        paused = false;
+        try
+        {
+            Thread[] t = new Thread[threadNum];
+            for(int i = 0; i < threadNum; i++)
+            {
+                long loc = 0;
+                int a = 0;
+                File data = new File(fileDir + File.separator + fileName + fileExtension + ".dat" + i);
+                FileInputStream fin = new FileInputStream(data);
+                while(a != -1)
+                {
+                    a = Integer.valueOf(fin.read() +"");
+                    if (a != -1) loc = loc * 10 + a;
+                }
+
+                final int finalI = i;
+                final File finalFile = fileNow;
+                final double begin = i * byte0 + loc;
+                final double end;
+                if(i == threadNum - 1) end = totalByte + 1;
+                else end = (i + 1)* byte0 - 1;
+                t[i] = new Thread() {
+                    public void run() {
+                        try {
+                            InputStream is;
+                            RandomAccessFile raf = new RandomAccessFile(finalFile, "rwd");
+                            raf.seek((long)begin);
+
+                            download(raf, (long)begin, (long)end, finalI);
+
+                        }
+                        catch (Exception e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                };
+                t[i].start();
+            }
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    private void download(InputStream is, FileOutputStream fos)//第一代下载方法，缺点：单线程，没法暂停中断
     {
        try
        {
            final int bufSize = 128;
            byte buf[] = new byte[bufSize];
-           for(;;)
+           for(;!paused;)
            {
                int numread = is.read(buf);
                if (numread <= 0)
@@ -139,6 +202,47 @@ public class Task extends MainActivity{
        {
            e.printStackTrace();
        }
+    }
+
+    private void download(RandomAccessFile raf, long begin, long end, int thread)
+    {
+        try
+        {
+            final int bufSize = 128;
+            byte buf[] = new byte[bufSize];
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(10 * 1000);
+            conn.setRequestProperty("Range", "bytes="+begin+"-"+(end-1));
+
+            InputStream is = url.openStream();
+            if (is == null)
+            {
+                Log.e("conn: ", "a");
+            }
+
+            while(!paused)
+            {
+                int numread = is.read(buf);
+                if (numread <= 0)
+                {
+                    completed = true;
+                    Message msg = new Message();
+                    msg.what = 10;
+                    handler.sendMessage(msg);
+                    return;
+                }
+                raf.write(buf, 0, numread);
+                finished += bufSize;
+                finished0[thread] += 128;
+            }
+            File data = new File(fileDir + File.separator + fileName + fileExtension + ".dat" + thread);
+            FileOutputStream fos = new FileOutputStream(data);
+            fos.write(Long.toString(finished0[thread]).getBytes());
+        }
+        catch(Exception e)
+        {
+            e.printStackTrace();
+        }
     }
 
     String percentage()

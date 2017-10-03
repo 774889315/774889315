@@ -48,6 +48,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     TextView num;
     Button bt;
     Button bt2;
+    Button p;
+    Button rs;
     Button prev;
     Button next;
     ProgressBar pb;
@@ -74,17 +76,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         NotificationManager manager = (NotificationManager)
                 getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder builder1 = new Notification.Builder(MainActivity.this);
-        builder1.setSmallIcon(R.drawable.icon); //设置图标
-        //     builder1.setTicker("显示第二个通知");
-        builder1.setContentTitle(fileName); //设置标题
-        builder1.setContentText("正在下载  -  " + progress); //消息内容
-        builder1.setWhen(System.currentTimeMillis()); //发送时间
-        builder1.setAutoCancel(true);//打开程序后图标消失
+        builder1.setSmallIcon(R.drawable.icon);
+        //     builder1.setTicker("a");
+        builder1.setContentTitle(fileName);
+        builder1.setContentText("Downloading...  -  " + progress);
+        builder1.setWhen(System.currentTimeMillis());
+        builder1.setAutoCancel(true);
         Intent intent =new Intent (MainActivity.this, MainActivity.class);
         PendingIntent pendingIntent =PendingIntent.getActivity(MainActivity.this, 0, intent, 0);
         builder1.setContentIntent(pendingIntent);
         Notification notification1 = builder1.build();
-        manager.notify(id, notification1); // 通过通知管理器发送通知
+        manager.notify(id, notification1);
     }
 
     void notify1(String fileName, int id)
@@ -93,20 +95,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         NotificationManager manager = (NotificationManager)
                 getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder builder1 = new Notification.Builder(MainActivity.this);
-        builder1.setSmallIcon(R.drawable.icon); //设置图标
-   //     builder1.setTicker("显示第二个通知");
-        builder1.setContentTitle(fileName); //设置标题
-        builder1.setContentText("下载完成"); //消息内容
-        builder1.setWhen(System.currentTimeMillis()); //发送时间
-        builder1.setDefaults(Notification.DEFAULT_SOUND); //设置默认的提示音，振动方式，灯光
+        builder1.setSmallIcon(R.drawable.icon);
+   //     builder1.setTicker("a");
+        builder1.setContentTitle(fileName);
+        builder1.setContentText("Completed");
+        builder1.setWhen(System.currentTimeMillis());
+        builder1.setDefaults(Notification.DEFAULT_SOUND);
         long[] vibrates = {0, 800, 1000, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200, 100, 200};
         builder1.setVibrate(vibrates);
-        builder1.setAutoCancel(true);//打开程序后图标消失
+        builder1.setAutoCancel(true);
         Intent intent =new Intent (MainActivity.this,MainActivity.class);
         PendingIntent pendingIntent =PendingIntent.getActivity(MainActivity.this, 0, intent, 0);
         builder1.setContentIntent(pendingIntent);
         Notification notification1 = builder1.build();
-        manager.notify(id, notification1); // 通过通知管理器发送通知
+        manager.notify(id, notification1);
     }
 
     public Handler handler = new Handler()
@@ -146,8 +148,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        input = (EditText)findViewById(R.id.editText);
-        bt = (Button)findViewById(R.id.button);
+        input = (EditText)findViewById(R.id.editText);//inputURL
+        bt = (Button)findViewById(R.id.button);//start
+        p = (Button)findViewById(R.id.button3);//pause
+        rs = (Button)findViewById(R.id.button4);//resume
         pb = (ProgressBar) findViewById(R.id.progressBar);
         startStatus = (TextView)findViewById(R.id.textView3);
         num = (TextView)findViewById(R.id.textView4);
@@ -155,7 +159,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         next = (Button)findViewById(R.id.button6);
 
         inputPath = (EditText)findViewById(R.id.editText2);
-        inputPath.setText(Task.fileDir.toString());
+        inputPath.setText(Task.nowPath);
 
 
 
@@ -197,14 +201,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         bt2 = (Button) findViewById(R.id.button2);
         bt2.setOnClickListener(new Button.OnClickListener()
         {
-
             @Override
             public void onClick(View v)
             {
                 File temp = new File(inputPath.getText().toString());
                 if (temp.exists())
                 {
-                    Task.fileDir = new File(inputPath.getText().toString());
+                    Task.nowPath = inputPath.getText().toString();
                     Toast.makeText(getApplicationContext(), "Change successfully!", Toast.LENGTH_SHORT).show();
                 }
                 else Toast.makeText(getApplicationContext(), "Error! Cannot find directory!", Toast.LENGTH_SHORT).show();
@@ -228,6 +231,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (taskNum < task.size() - 1) taskNum ++;
                 else if(task.size() != 0) taskNum = 0;
                 refresh();
+            }
+        });
+
+        p.setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                task.get(taskNum).paused();
+            }
+        });
+
+        rs.setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                task.get(taskNum).resume();
             }
         });
 

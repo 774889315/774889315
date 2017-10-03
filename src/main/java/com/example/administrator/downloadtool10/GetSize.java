@@ -19,7 +19,6 @@ public class GetSize extends Task implements Runnable
     double fileSize;
     public void run() {
         try
-
         {
             URLConnection urlcon = (HttpURLConnection) url.openConnection();
             fileSize = urlcon.getContentLength();
