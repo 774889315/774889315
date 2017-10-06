@@ -12,6 +12,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 
 /**
  * Created by Administrator on 2017/10/3.
@@ -19,151 +20,151 @@ import java.net.URL;
 
 public class MyService extends Service
 {
-    private DownloadBinder mb = new DownloadBinder();
+    ArrayList<Task> task  = new ArrayList<>();
+
+    private DownloadBinder db = new DownloadBinder();
     @Override
     public IBinder onBind(Intent intent)
     {
-        stopSelf();
-        return null;
+        return db;
 
     }
 
-
-    private class DownloadBinder extends Binder
+    @Override
+    public void onCreate()
     {
-        URL url;
-        String fileName;
-        String fileExtension;
-        FileOutputStream fos;
-        String size = "Unknown";
-        double totalByte;
-        double finished;
-        double percentage = 0;
-        boolean completed = false;
 
-        DownloadBinder()
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startID)
+    {
+     //   for(;;)
         {
-
-        }
-        DownloadBinder(URL url)
-        {
-            this.url = url;
-            fileName = getFileName();
-            fileExtension = getFileExtension();
-            FileOutputStream fos;
-
-
-            //       MainActivity.task0.setText("File name: " + fileName + "   File extension: " + fileExtension);
-        }
-
-        String getSize()
-        {
-            //if(size.equals("Unknown"))
+            if(task.size() > 0)
             {
-                GetSize getSize = new GetSize(url);
-                Thread th = new Thread(getSize);
-                th.start();
-
-
-                while(th.isAlive())
+                for (int i = 0; i < task.size(); i ++)
                 {
-                    size = getSize.size0;
-                    totalByte = getSize.fileSize;
-                }
-            }
-
-            return size;
-        }
-
-        String getFileName()
-        {
-            String strName = url.getPath();
-            strName = strName.substring(strName.lastIndexOf("/") + 1, strName.lastIndexOf(".") - 1);
-            return strName;
-        }
-
-        String getFileExtension()
-        {
-            String strExtension = url.getPath();
-            strExtension = strExtension.substring(Math.max(strExtension.lastIndexOf("."), strExtension.lastIndexOf("/") + 1)).toLowerCase();
-            if (strExtension.equals(getFileName())) strExtension = "";
-            return strExtension;
-        }
-
-        void start()
-        {
-            Thread th = new Thread() {
-                public void run() {
-                    try
-
+                    if (!task.get(i).started)
                     {
-                        InputStream is;
-                        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                        conn.setConnectTimeout(3 * 1000);
-                        //        conn.connect();
-                        //   Log.e("conn: ", conn.toString());
-                        is = url.openStream();
-
-                        //    InputStream is = conn.getInputStream();
-
-                        if (is == null) {
-                            Log.e("conn: ", "a");
-                        }
-                        File fileDir = new File("/storage/emulated/0/dl");
-//                    if (!fileDir.exists())
-                        {
-//                        fileDir.mkdir();
-                        }
-                        File file = new File(fileDir.toString() + File.separator + fileName + fileExtension);
-                        for(int i = 1; file.exists(); i++)
-                        {
-                            file = new File(fileDir + File.separator + fileName + "_" + i + fileExtension);//防止覆盖
-                        }
-                        fos = new FileOutputStream(file);
-                        download(is, fos);
-
-                    } catch (
-                            Exception e)
-
-                    {
-                        e.printStackTrace();
+                        task.get(i).started = true;
+                        task.get(i).start();
                     }
                 }
-            };
-            th.start();
-        }
-
-        private void download(InputStream is, FileOutputStream fos)
-        {
+            }
             try
             {
-                final int bufSize = 128;
-                byte buf[] = new byte[bufSize];
-                for(;;)
-                {
-                    int numread = is.read(buf);
-                    if (numread <= 0)
-                    {
-                        completed = true;
-                        break;
-                    }
-                    fos.write(buf, 0, numread);
-                    finished += bufSize;
-                }
+                Thread.sleep(1000);
             }
-            catch(Exception e)
+            catch (InterruptedException e)
             {
                 e.printStackTrace();
             }
         }
+        return flags;
+    }
 
-        String percentage()
+    @Override
+    public void onDestroy()
+    {
+    }
+
+
+    class DownloadBinder extends Binder
+    {
+        int getTaskSize()
         {
+            return task.size();
+        }
 
-            percentage = finished / totalByte * 100;
-            if (percentage < 100) return(percentage + " %");
-            return ("Download successfully!");
+        long getTaskFinished(int num)
+        {
+            return task.get(num).finished;
+        }
 
+        boolean getTaskIsPaused(int num)
+        {
+            return task.get(num).isPaused();
+        }
+
+        boolean getTaskIsCompleted(int num)
+        {
+            return task.get(num).completed;
+        }
+
+        String getTaskPercentage(int num)
+        {
+            return task.get(num).percentage();
+        }
+
+        double getTaskPercentageN(int num)
+        {
+            return task.get(num).percentage;
+        }
+
+        String getFileWholeName(int num)
+        {
+            return task.get(num).fileName + task.get(num).fileExtension;
+        }
+
+        URL getTaskURL(int num)
+        {
+            return task.get(num).url;
+        }
+
+        String initFileSize(int num)
+        {
+            return task.get(num).getSize();
+        }
+
+   //     String getFileSize(int num)
+        {
+   //         return task.get(num).size;
+        }
+
+        int getTaskId(int num)
+        {
+            return task.get(num).id;
+        }
+
+        void initTaskId(int num, int id)
+        {
+            task.get(num).id = id;
+        }
+
+        File getFile(int num)
+        {
+            return task.get(num).fileNow;
+        }
+
+        void pauseTask(int num)
+        {
+            task.get(num).pause();
+        }
+
+        void resumeTask(int num)
+        {
+            task.get(num).resume();
+        }
+
+        void removeTask(int num)
+        {
+            task.remove(num);
+        }
+
+        void setNotified(int num)
+        {
+            task.get(num).notified = true;
+        }
+
+        boolean getNotified(int num)
+        {
+            return task.get(num).notified;
+        }
+
+        void addTask(URL url)
+        {
+            task.add(0, new Task(url));
         }
     }
 }

@@ -16,7 +16,7 @@ public class GetSize extends Task implements Runnable
     }
 
     String size0 = "Unknown";
-    double fileSize;
+    double fileSize = 1e12;
     public void run() {
         try
         {
@@ -26,8 +26,7 @@ public class GetSize extends Task implements Runnable
             else if(fileSize <= 1e6) size0 = fileSize/1024 + " kB";
             else if(fileSize <= 1e9) size0 = fileSize/1024/1024 + " MB";
             else size0 = fileSize/1024/1024/1024 + " GB";
-        } catch (
-                IOException e)
+        } catch (IOException e)
 
         {
             e.printStackTrace();
