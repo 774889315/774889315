@@ -8,7 +8,7 @@ import java.net.URLConnection;
 /**
  * Created by Administrator on 2017/10/3.
  */
-public class GetSize extends Task implements Runnable
+class GetSize extends Task implements Runnable
 {
 
     GetSize(URL url) {

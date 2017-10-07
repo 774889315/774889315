@@ -4,19 +4,9 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
-import android.support.annotation.Nullable;
-import android.util.Log;
-
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-
-/**
- * Created by Administrator on 2017/10/3.
- */
 
 public class MyService extends Service
 {
@@ -27,7 +17,6 @@ public class MyService extends Service
     public IBinder onBind(Intent intent)
     {
         return db;
-
     }
 
     @Override
@@ -39,26 +28,23 @@ public class MyService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startID)
     {
-     //   for(;;)
+        if(task.size() > 0)
         {
-            if(task.size() > 0)
+            for (int i = 0; i < task.size(); i ++)
             {
-                for (int i = 0; i < task.size(); i ++)
+                if (!task.get(i).started)
                 {
-                    if (!task.get(i).started)
-                    {
-                        task.get(i).started = true;
-                        task.get(i).start();
-                    }
+                    task.get(i).started = true;
+                    task.get(i).start();
+                    return flags;
                 }
             }
-            try
+            for (int i = 0; i < task.size(); i ++)
             {
-                Thread.sleep(1000);
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
+                if(!task.get(i).completed && task.get(i).isPaused())
+                {
+                    task.get(i).resume();
+                }
             }
         }
         return flags;
@@ -67,6 +53,19 @@ public class MyService extends Service
     @Override
     public void onDestroy()
     {
+       super.onDestroy();
+        if(task.size() > 0)
+        {
+            for (int i = 0; i < task.size(); i++)
+            {
+                task.get(i).pause();
+            }
+        }
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -107,20 +106,14 @@ public class MyService extends Service
             return task.get(num).fileName + task.get(num).fileExtension;
         }
 
-        URL getTaskURL(int num)
-        {
-            return task.get(num).url;
-        }
+     //   URL getTaskURL(int num) { return task.get(num).url; }
 
         String initFileSize(int num)
         {
             return task.get(num).getSize();
         }
 
-   //     String getFileSize(int num)
-        {
-   //         return task.get(num).size;
-        }
+     //   String getFileSize(int num) { return task.get(num).size; }
 
         int getTaskId(int num)
         {
@@ -142,10 +135,7 @@ public class MyService extends Service
             task.get(num).pause();
         }
 
-        void resumeTask(int num)
-        {
-            task.get(num).resume();
-        }
+   //     void resumeTask(int num){ task.get(num).resume(); }
 
         void removeTask(int num)
         {
@@ -165,6 +155,11 @@ public class MyService extends Service
         void addTask(URL url)
         {
             task.add(0, new Task(url));
+        }
+
+        long getSpeed(int num)
+        {
+            return task.get(num).speed;
         }
     }
 }

@@ -1,13 +1,11 @@
 package com.example.administrator.downloadtool10;
 
-import android.app.AlertDialog;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.graphics.Color;
@@ -16,11 +14,10 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
-import android.support.annotation.RequiresApi;
+
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.Button;
@@ -30,14 +27,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.util.ArrayList;
 import java.util.Locale;
 
 
@@ -48,7 +39,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public static final int SHOW_TIMEOUT = 3;
     public static final int SHOW_COMPLETED = 4;
     public static final int SHOW_PAUSED = 5;
-  //  public static final int NOTIFY = 10;
     EditText input;
     TextView task0;
     TextView taskStatus;
@@ -85,7 +75,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         public void onServiceConnected(ComponentName name, IBinder service)
         {
-            Log.w("aaaaaaa","finished");
             downloadBinder = (MyService.DownloadBinder) service;
         }
     };
@@ -112,31 +101,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             return "file/*";
         }
         String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(suffix);
-        if (type != null || !type.isEmpty()) {
+        if (type != null) {
             return type;
         }
         return "file/*";
     }
-    /*
-    NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-    Notification notf;
 
-    notf = new Notification(R.drawable.icon, "DownloadTool", System.currentTimeMillis());
-
-        notf.setLatestEventInfo(context, "", "", null);
-*/
-    void notify0(String fileName, String progress, int id)
+    void notify0(String fileName, String progress, long speed, int id)
     {
+        String speed0;
+        if(speed <= 1000) speed0 = speed + " B/s";
+        else if(speed <= 1e6) speed0 = (int)(speed/1024.0 * 100)/ 100.0 + " kB/s";
+        else speed0 = (int)(speed/1024.0/1024.0 * 100)/ 100.0 + " MB/s";
         NotificationManager manager = (NotificationManager)
                 getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder builder1 = new Notification.Builder(MainActivity.this);
         builder1.setSmallIcon(R.drawable.icon);
-        //     builder1.setTicker("a");
         builder1.setContentTitle(fileName);
-        builder1.setContentText("Downloading...  -  " + progress);
+        builder1.setContentText("Downloading...  -  " + progress + "\t" + speed0);
         builder1.setWhen(System.currentTimeMillis());
         builder1.setAutoCancel(true);
-        Intent intent =new Intent(Intent.ACTION_VIEW);
+        Intent intent = getIntent();
         PendingIntent pendingIntent =PendingIntent.getActivity(this, 0, intent, 0);
         builder1.setContentIntent(pendingIntent);
         Notification notification1 = builder1.build();
@@ -150,7 +135,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 getSystemService(NOTIFICATION_SERVICE);
         Notification.Builder builder1 = new Notification.Builder(MainActivity.this);
         builder1.setSmallIcon(R.drawable.icon);
-   //     builder1.setTicker("a");
         builder1.setContentTitle(fileName);
         builder1.setContentText("Completed");
         builder1.setWhen(System.currentTimeMillis());
@@ -178,7 +162,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public Handler handler = new Handler()
     {
-        @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
         public void handleMessage(Message msg)
         {
             switch (msg.what)
@@ -204,15 +187,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             case UPDATE:
                 refresh();
                 break;
-        //    case NOTIFY:
-     //           notify1();
-       //         break;
             default:
                 break;
             }
         }
     };
- //   String task[] = new String[100];
+
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
@@ -220,9 +200,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         startIntent = new Intent(this, MyService.class);
         bindService(startIntent, connection, BIND_AUTO_CREATE);
-
-      //  Log.i("downloadBinder = ", downloadBinder.toString());
-
         setContentView(R.layout.activity_main);
         input = (EditText)findViewById(R.id.editText);//inputURL
         bt = (Button)findViewById(R.id.button);//start
@@ -294,7 +271,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             @Override
             public void onClick(View v)
             {
-                downloadBinder.resumeTask(taskNum);
+                startService (startIntent);
             }
         });
 
@@ -332,7 +309,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         intent.setDataAndType(Uri.fromFile(fileNow), getMimeType(fileNow));
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     }
-                    startActivity(intent);
+                    try
+                    {
+                        startActivity(intent);
+                    }
+                    catch(Exception e)
+                    {
+                        Toast.makeText(getApplicationContext(), "Can't open the file!", Toast.LENGTH_SHORT).show();//防止文件类型无法打开
+                    }
                 }
                 else if(downloadBinder.getTaskSize() > 0)
                 {
@@ -348,27 +332,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         try {
             ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            URL u = new URL(cm.getText().toString());
             input.setText(cm.getText());
-        } catch (Exception e) { } //若剪切板内容不是URL则不会自动粘贴
+        } catch (Exception ignored) { } //若剪切板内容不是URL则不会自动粘贴
 
         taskStatus = (TextView)findViewById(R.id.textView2);
-/*
-        Thread th = new Thread(){
-            public void run() {
-                try {
-                    Thread.sleep(10000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                if (getTaskSize() >= 1) taskStatus.setText(getTaskPercentage(taskNum));
-            }
-        };
-*/
-     //   th.start();
-
-
-//        new LooperThread("").run();
 
         new Thread()
         {
@@ -393,30 +360,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }.start();
     }
-/*
-    private class LooperThread extends Thread {
 
-        private String text;
-
-        public LooperThread(String text) {
-            this.text = text;
-        }
-
-        @Override
-        public void run() {
-             if (getTaskSize() >= 1) taskStatus.setText(getTaskPercentage(taskNum));
-        }
-    }
-*/
-    double realSpeed;
     void refresh()
     {
         if (downloadBinder.getTaskSize() >= 1)
         {
-            speed = realSpeed;
         //    speed = (realSpeed + speed * 1)/ 2;
-            realSpeed = downloadBinder.getTaskFinished(taskNum) - finished;
-            if (realSpeed == 0) time ++;
+            speed = downloadBinder.getSpeed(taskNum);
+            if (speed == 0) time ++;
             else
             {
                 time = 0;
@@ -444,22 +395,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 handler.sendMessage(message);
             }
             finished = downloadBinder.getTaskFinished(taskNum);
-            String speed = "0.0 B/s";
+            String speed;
             if(this.speed <= 1000) speed = this.speed + " B/s";
-            else if(this.speed <= 1e6) speed = this.speed/1024 + " kB/s";
-            else speed = this.speed/1024/1024 + " MB/s";
+            else if(this.speed <= 1e6) speed = (int)(this.speed/1024.0 * 100)/ 100.0 + " kB/s";
+            else speed = (int)(this.speed/1024.0/1024.0 * 100)/ 100.0 + " MB/s";
             taskStatus.setTextColor(Color.rgb(120, 50, 200));
             taskStatus.setText(downloadBinder.getTaskPercentage(taskNum) + "\t\t\t" + speed);
             pb.setMax(10000);
             pb.setProgress((int) (downloadBinder.getTaskPercentageN(taskNum) * 100));
-            setTitle("MyDownloadTool - Task "+ taskNum);
+            setTitle("WarlfDownloadTool - Task "+ taskNum);
             task0.setText("File name: " + downloadBinder.getFileWholeName(taskNum)
-                    + "\nURL: " + downloadBinder.getTaskURL(taskNum) + "\nSize: " + downloadBinder.initFileSize(taskNum));
+      //              + "\nURL: " + downloadBinder.getTaskURL(taskNum)
+                    + "\nSize: " + downloadBinder.initFileSize(taskNum));
             num.setText("Task " + taskNum);
             for(int i = 0; i < downloadBinder.getTaskSize(); i++)
                 if (!downloadBinder.getTaskIsCompleted(i))
                 {
-                    notify0(downloadBinder.getFileWholeName(i), downloadBinder.getTaskPercentage(i), downloadBinder.getTaskId(i));
+                    notify0(downloadBinder.getFileWholeName(i), downloadBinder.getTaskPercentage(i), downloadBinder.getSpeed(i), downloadBinder.getTaskId(i));
                 }
 
                 else if (!downloadBinder.getNotified(i))
@@ -468,10 +420,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     downloadBinder.setNotified(i);
                 }
         }
-        else
+        else if(task0 != null)
         {
             num.setText("null");
-         //   task0.setText(" ");
+            task0.setText("Hello, world!");
+            taskStatus.setText("Hello, Warlf!");
+            setTitle("WarlfDownloadTool 1.0 - null");
+            pb.setProgress(0);
         }
     }
 
@@ -486,12 +441,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 url0 = new URL(input.getText().toString());
                 downloadBinder.addTask(url0);
                 downloadBinder.initTaskId(taskNum, a++);
-                //               downloadBinder.task.get(taskNum).start();
-                //    if(i != 0) Log.e("Failed!!", "Exception "+i);
-                //    else
-                {
-                    //      taskStatus.setText("Download successfully!");
-                }
                 startStatus.setTextColor(Color.rgb(0, 150, 0));
                 startStatus.setText("Start successfully!");
                 input.setText("");
@@ -508,7 +457,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 taskStatus.setText("Failed!");
             }
         }
+    }
 
+    @Override
+    public void onDestroy()
+    {
+        super.onDestroy();
+        if(downloadBinder.getTaskSize() > 0)
+        {
+            for (int i = 0; i < downloadBinder.getTaskSize(); i++)
+            {
+                downloadBinder.pauseTask(i);
+            }
+        }
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
 

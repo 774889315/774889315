@@ -1,58 +1,54 @@
 package com.example.administrator.downloadtool10;
 
-import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Objects;
 
-/**
- * Created by Administrator on 2017/10/3.
- */
-public class Task {
-    File fileDir = new File("/storage/emulated/0/dl");
+class Task {
     static String nowPath = "/storage/emulated/0/dl";
     URL url;
     String fileName;
     String fileExtension;
     File fileNow = null;
-    public String size = "Unknown";
-    long totalByte;
-    long byte0;
+    private String size = "Unknown";
+    private long totalByte;
+    private long byte0;
     long finished;
     double percentage = 0;
     boolean completed = false;
     boolean notified = false;
     public int id = -1;
+    private final int bufSize = 1024;
+    boolean started;
+    long speed;
+
+    private int threadNum = 4;
+
+    private Thread[] t = new Thread[threadNum];
+
     private boolean paused;
     private RandomAccessFile raf;
-    final int bufSize = 1024;
-    public boolean started;
-
-    int threadNum = 4;
-
-    Thread[] t = new Thread[threadNum];
-
     private long finished0[] = new long[threadNum];
+    private boolean resumed;
 
     Task(URL url)
     {
-        fileDir = new File(nowPath);
+        File fileDir = new File(nowPath);
         this.url = url;
         fileName = getFileName();
         fileExtension = getFileExtension();
         paused = false;
       //  FileOutputStream fos;
         fileNow = new File(fileDir + File.separator + fileName + fileExtension);
-        for (int i = 1; fileNow.exists(); i++)
+        for (int i = 1; ! new File(fileNow + ".dat0").exists() && fileNow.exists(); i++)
         {
             fileNow = new File(fileDir + File.separator + fileName + "_" + i + fileExtension);//防止覆盖
         }
@@ -62,14 +58,34 @@ public class Task {
         //       MainActivity.task0.setText("File name: " + fileName + "   File extension: " + fileExtension);
     }
 
-    public void pause()
+    void pause()
     {
+        if(!Objects.equals(percentage(), "99.99 %"))
         paused = true;
+        resumed = false;
     }
-    public boolean isPaused()
+    boolean isPaused()
     {
         return paused;
     }
+
+    private Thread getSpeed = new Thread()
+    {
+        @Override
+        public void run()
+        {
+            for(; !completed;)
+            {
+                long finished0 = finished;
+                try {
+                    sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                speed = finished - finished0;
+            }
+        }
+    };
 
     String getSize()
     {
@@ -84,21 +100,21 @@ public class Task {
             {
                 size = getSize.size0;
                 totalByte = (long) getSize.fileSize;
-                byte0 =(long) (totalByte / threadNum / bufSize) * bufSize;
+                byte0 = totalByte / threadNum / bufSize * bufSize;
             }
         }
 
         return size;
     }
 
-    String getFileName()
+    private String getFileName()
     {
         String strName = url.getPath();
         strName = strName.substring(strName.lastIndexOf("/") + 1, strName.lastIndexOf("."));
         return strName;
     }
 
-    String getFileExtension()
+    private String getFileExtension()
     {
         String strExtension = url.getPath();
         strExtension = strExtension.substring(Math.max(strExtension.lastIndexOf("."), strExtension.lastIndexOf("/") + 1)).toLowerCase();
@@ -106,17 +122,17 @@ public class Task {
         return strExtension;
     }
 
-    public void start()
+    void start()
     {
         getSize();
-/*
-        try
+        resumed = false;
+        if(new File(fileNow + ".dat0").exists())
         {
-            FileOutputStream fos = new FileOutputStream(fileNow);
-            for(long d = 0; d < totalByte; d++) fos.write(0);
-            fos.close();
-        }catch(Exception e) {e.printStackTrace();}
-*/
+            paused = true;
+            resume();
+            getSpeed.start();
+            return;
+        }
         for (int i = 0; i < threadNum; i++)
         {
             final int finalI = i;
@@ -133,11 +149,9 @@ public class Task {
             }
             t[i] = new Thread() {
                 public void run() {
-                    try {
-                        InputStream is;
-
-                        download(raf, begin, end, finalI);
-
+                    try
+                    {
+                        download(begin, end, finalI);
                     }
                     catch (Exception e)
                     {
@@ -147,17 +161,22 @@ public class Task {
             };
             t[i].start();
         }
+        getSpeed.start();
     }
 
-    public void resume()
+    void resume()
     {
-        if(paused)
+        if(paused && !resumed)
         {
+            resumed = true;
+            try {
+                Thread.sleep(300);//延迟300毫米，防止切换过快而出错
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             paused = false;
             try
             {
-                raf = new RandomAccessFile(fileNow, "rwd");
-                raf.setLength(totalByte);
                 for (int i = 0; i < threadNum; i++)
                 {
                     long loc = 0;
@@ -171,21 +190,23 @@ public class Task {
                         }
                     }catch(Exception e){
                         loc = 0;
+                        e.printStackTrace();
                     }
-                    //        Log.e("aaaaaaaaaaaaaaaaaaaaaa ", loc+"");
+                    finished0[i] = loc;
                     final int finalI = i;
-       //             final File finalFile = fileNow;
                     final long begin = i * byte0 + loc;
                     final long end;
                     if (i == threadNum - 1) end = totalByte + 1;
                     else end = (i + 1) * byte0 - 1;
+                    raf = new RandomAccessFile(fileNow, "rwd");
+                    raf.setLength(totalByte);
                     t[i] = new Thread()
                     {
                         public void run()
                         {
                             try
                             {
-                                download(raf, begin, end, finalI);
+                                download(begin, end, finalI);
 
                             }
                             catch (Exception e)
@@ -196,6 +217,13 @@ public class Task {
                     };
                     t[i].start();
                 }
+                finished = 0;
+                for (int i = 0; i < threadNum; i++)
+                {
+                    finished += finished0[i];
+                }
+                percentage();
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -229,11 +257,11 @@ public class Task {
        }
     }
 
-    private void download(RandomAccessFile raf, long begin, long end, int thread)
+    private void download(long begin, long end, int thread)
     {
         try
         {
-            raf = new RandomAccessFile(fileNow, "rwd");
+            RandomAccessFile raf = new RandomAccessFile(fileNow, "rwd");
             raf.setLength(totalByte);
             byte buf[] = new byte[bufSize];
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -249,14 +277,10 @@ public class Task {
             raf.seek(begin);
             while(!paused)
             {
+                assert is != null;
                 int numread = is.read(buf);
                 if (numread <= 0)
                 {
-            //        raf.write(buf, 0, numread);
-             //       completed = true;
-        //            Message msg = new Message();
-         //           msg.what = 10;
-         //           handler.sendMessage(msg);
                     return;
                 }
                 raf.write(buf, 0, numread);
@@ -265,7 +289,8 @@ public class Task {
             }
             File data = new File(fileNow + ".dat" + thread);
             FileOutputStream fos = new FileOutputStream(data);
-            fos.write(Long.toString(finished0[thread]).getBytes());
+            finished0[thread] -= bufSize * 512;
+            fos.write((finished0[thread] + "").getBytes());
         }
         catch(Exception e)
         {
@@ -275,9 +300,8 @@ public class Task {
 
     String percentage()
     {
-
         percentage = (finished+0.0) / totalByte * 100;
-        if (percentage < 100) return(percentage + " %");
+        if (percentage < 100) return((int)(percentage * 100)/ 100.0 + " %");
         boolean done = true;
         for(int i = 0; i < threadNum; i++)
         {
@@ -286,6 +310,17 @@ public class Task {
         if(done)
         {
             completed = true;
+            speed = 0;
+            for(int i = 0; i < threadNum; i++)
+            {
+                try
+                {
+                    new File(fileNow + ".dat" + i).delete();
+                }
+                catch(Exception e)
+                {
+                }
+            }
             return ("Download successfully!");
         }
         return "99.99 %";

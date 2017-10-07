@@ -5,7 +5,7 @@
     <application
         android:allowBackup="true"
         android:icon="@drawable/icon"
-        android:label="WolfDownloadTool 1.0"
+        android:label="WarlfDownloadTool 1.0"
         android:roundIcon="@drawable/icon"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
@@ -15,7 +15,13 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+    <!--        <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="myapp" android:host="jp.app" android:pathPrefix="/openwith"/>
+            </intent-filter>
+    -->    </activity>
         <service android:name = ".MyService"/>
         <provider
             android:name="android.support.v4.content.FileProvider"
